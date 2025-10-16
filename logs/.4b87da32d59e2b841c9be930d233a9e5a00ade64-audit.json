@@ -1,0 +1,15 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 14
+    },
+    "auditLog": "/Users/mangesh/max-py/pyai/logs/.4b87da32d59e2b841c9be930d233a9e5a00ade64-audit.json",
+    "files": [
+        {
+            "date": 1760496957878,
+            "name": "/Users/mangesh/max-py/pyai/logs/mcp-puppeteer-2025-10-15.log",
+            "hash": "ed6a38f21fad3a9b776676e47030d9d9d4b4786413ad931b7b35dc1ab84c3d9b"
+        }
+    ],
+    "hashType": "sha256"
+}

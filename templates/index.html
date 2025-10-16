@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Network Logger</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0f0f23;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #1a1a2e;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            padding: 30px;
+            border: 1px solid #2a2a3e;
+        }
+
+        h1 {
+            color: #e0e0e0;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        h2 {
+            color: #e0e0e0;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            justify-content: center;
+        }
+
+        input[type="text"] {
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 600;
+        }
+
+        .btn-start {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .btn-start:hover {
+            background: #45a049;
+        }
+
+        .btn-stop {
+            background: #f44336;
+            color: white;
+        }
+
+        .btn-stop:hover {
+            background: #da190b;
+        }
+
+        .btn-export {
+            background: #2196F3;
+            color: white;
+        }
+
+        .btn-export:hover {
+            background: #0b7dda;
+        }
+
+        .btn-clear {
+            background: #ff9800;
+            color: white;
+        }
+
+        .btn-clear:hover {
+            background: #e68900;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        button:disabled:hover {
+            transform: none;
+            box-shadow: none;
+        }
+
+        .status {
+            padding: 15px;
+            background: #252540;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-weight: 500;
+            color: #b0b0b0;
+            border: 1px solid #2a2a3e;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            opacity: 0.9;
+            margin-bottom: 5px;
+        }
+
+        .stat-value {
+            font-size: 28px;
+            font-weight: bold;
+        }
+
+        .logs-container {
+            background: #252540;
+            border-radius: 5px;
+            padding: 20px;
+            max-height: 500px;
+            overflow-y: auto;
+            border: 1px solid #2a2a3e;
+        }
+
+        .logs-container p {
+            color: #707070;
+        }
+
+        .log-entry {
+            background: #1e1e32;
+            padding: 12px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            border-left: 4px solid #667eea;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            border: 1px solid #2a2a3e;
+        }
+
+        .log-entry:hover {
+            box-shadow: 0 2px 5px rgba(102, 126, 234, 0.3);
+            background: #252540;
+        }
+
+        .log-url {
+            color: #b0b0b0;
+            word-break: break-all;
+            margin-bottom: 5px;
+        }
+
+        .log-metrics {
+            color: #a0a0ff;
+            font-weight: bold;
+        }
+
+        .log-status {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            margin-left: 10px;
+        }
+
+        .status-200 { background: #4CAF50; color: white; }
+        .status-300 { background: #2196F3; color: white; }
+        .status-400 { background: #ff9800; color: white; }
+        .status-500 { background: #f44336; color: white; }
+
+        @media (max-width: 768px) {
+            .controls {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Subtle snackbar notification styling */
+        .notification {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: #2a2a3e;
+            color: #e0e0e0;
+            padding: 12px 20px;
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            z-index: 10000;
+            min-width: 280px;
+            max-width: 500px;
+            opacity: 0;
+            transition: all 0.3s ease-in-out;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-left: 3px solid #667eea;
+        }
+
+        .notification.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .notification.success {
+            border-left-color: #4CAF50;
+        }
+
+        .notification.error {
+            border-left-color: #d32f2f;
+        }
+
+        .notification.warning {
+            border-left-color: #ff9800;
+        }
+
+        .notification-icon {
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+
+        .notification-message {
+            flex: 1;
+            opacity: 0.95;
+        }
+
+        /* Confirmation modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            backdrop-filter: blur(4px);
+        }
+
+        .modal-overlay.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background: #1a1a2e;
+            border: 1px solid #2a2a3e;
+            border-radius: 10px;
+            padding: 30px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+        }
+
+        .modal-title {
+            color: #e0e0e0;
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .modal-message {
+            color: #b0b0b0;
+            font-size: 14px;
+            line-height: 1.5;
+            margin-bottom: 24px;
+        }
+
+        .modal-input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #667eea;
+            border-radius: 5px;
+            font-size: 14px;
+            background: #252540;
+            color: #e0e0e0;
+            margin-bottom: 24px;
+            font-family: inherit;
+        }
+
+        .modal-input:focus {
+            outline: none;
+            border-color: #a0a0ff;
+            box-shadow: 0 0 0 2px rgba(160, 160, 255, 0.2);
+        }
+
+        .modal-input::placeholder {
+            color: #707070;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+
+        .modal-btn {
+            padding: 10px 24px;
+            border: none;
+            border-radius: 5px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .modal-btn-cancel {
+            background: #2a2a3e;
+            color: #e0e0e0;
+        }
+
+        .modal-btn-cancel:hover {
+            background: #3a3a4e;
+        }
+
+        .modal-btn-confirm {
+            background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+            color: white;
+        }
+
+        .modal-btn-confirm:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(255, 152, 0, 0.4);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Network Logger</h1>
+
+        <div class="controls">
+            <button class="btn-start" onclick="startLogging()">Start Browser</button>
+            <button id="btnStop" class="btn-stop" onclick="stopLogging()" disabled>Stop Logging</button>
+            <button id="btnSave" class="btn-export" onclick="saveCurrentLogs()" disabled>Save Logs</button>
+            <button id="btnExportNetwork" class="btn-export" onclick="exportLogs()" disabled>Export Network CSV</button>
+            <button id="btnExportVitals" class="btn-export" onclick="exportVitals()" disabled>Export Web Vitals CSV</button>
+            <button id="btnClear" class="btn-clear" onclick="clearLogs()" disabled>Clear</button>
+            <button class="btn-export" onclick="window.location.href='/reports'">View Reports</button>
+        </div>
+
+        <div class="status" id="status">Click "Start Browser" to open a browser window and begin logging network activity</div>
+
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-label">Total Requests</div>
+                <div class="stat-value" id="totalRequests">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Avg Duration (ms)</div>
+                <div class="stat-value" id="avgDuration">0.00</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Total Size (KB)</div>
+                <div class="stat-value" id="totalSize">0</div>
+            </div>
+        </div>
+
+        <h2 style="margin: 30px 0 15px 0; color: #333;">Web Vitals</h2>
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-label">LCP (ms)</div>
+                <div class="stat-value" id="lcpValue">-</div>
+                <div class="stat-label" id="lcpRating" style="margin-top: 5px; font-size: 10px;"></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">INP/FID (ms)</div>
+                <div class="stat-value" id="inpValue">-</div>
+                <div class="stat-label" id="inpRating" style="margin-top: 5px; font-size: 10px;"></div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">CLS</div>
+                <div class="stat-value" id="clsValue">-</div>
+                <div class="stat-label" id="clsRating" style="margin-top: 5px; font-size: 10px;"></div>
+            </div>
+        </div>
+
+        <h2 style="margin: 30px 0 15px 0; color: #333;">Network Activity</h2>
+
+        <div class="logs-container" id="logsContainer">
+            <p style="text-align: center; color: #999;">No logs yet. Start logging to see network activity.</p>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div id="confirmModal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-title">
+                <span id="modalIcon">⚠️</span>
+                <span id="modalTitle">Confirm Action</span>
+            </div>
+            <div class="modal-message" id="modalMessage"></div>
+            <div class="modal-buttons">
+                <button class="modal-btn modal-btn-cancel" onclick="hideModal()">Cancel</button>
+                <button class="modal-btn modal-btn-confirm" id="modalConfirmBtn">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Subtle snackbar notification system
+        function showNotification(message, type = 'success') {
+            // Remove existing notification if any
+            const existing = document.querySelector('.notification');
+            if (existing) {
+                existing.remove();
+            }
+
+            // Create notification element
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+
+            // Set icon based on type
+            let icon = '✓';
+            if (type === 'error') {
+                icon = '✗';
+            } else if (type === 'warning') {
+                icon = '⚠';
+            }
+
+            notification.innerHTML = `
+                <span class="notification-icon">${icon}</span>
+                <div class="notification-message">${message}</div>
+            `;
+
+            document.body.appendChild(notification);
+
+            // Trigger animation
+            setTimeout(() => {
+                notification.classList.add('show');
+            }, 10);
+
+            // Auto remove after 3 seconds
+            setTimeout(() => {
+                notification.classList.remove('show');
+                setTimeout(() => {
+                    notification.remove();
+                }, 300);
+            }, 3000);
+        }
+
+        // Modal system
+        let modalCallback = null;
+
+        function showModal(title, message, icon, onConfirm) {
+            console.log('[MODAL] showModal called');
+            const modal = document.getElementById('confirmModal');
+            const modalTitle = document.getElementById('modalTitle');
+            const modalMessage = document.getElementById('modalMessage');
+            const modalIcon = document.getElementById('modalIcon');
+            const confirmBtn = document.getElementById('modalConfirmBtn');
+
+            modalTitle.textContent = title;
+            modalMessage.innerHTML = message;
+            modalIcon.textContent = icon;
+
+            modalCallback = onConfirm;
+            modal.classList.add('show');
+
+            // Set up confirm button
+            confirmBtn.onclick = () => {
+                console.log('[MODAL] Confirm button clicked');
+                const callback = modalCallback;  // Save callback before hideModal clears it
+                hideModal();
+                console.log('[MODAL] About to execute callback, callback exists:', !!callback);
+                if (callback) {
+                    callback();
+                }
+            };
+        }
+
+        function hideModal() {
+            const modal = document.getElementById('confirmModal');
+            const confirmBtn = document.getElementById('modalConfirmBtn');
+            modal.classList.remove('show');
+            modalCallback = null;
+            // Reset button text to default
+            confirmBtn.textContent = 'Confirm';
+        }
+
+        // Input modal system
+        function showInputModal(title, message, icon, placeholder, onConfirm) {
+            console.log('[INPUT_MODAL] showInputModal called');
+            const modal = document.getElementById('confirmModal');
+            const modalTitle = document.getElementById('modalTitle');
+            const modalMessage = document.getElementById('modalMessage');
+            const modalIcon = document.getElementById('modalIcon');
+            const confirmBtn = document.getElementById('modalConfirmBtn');
+
+            modalTitle.textContent = title;
+            modalIcon.textContent = icon;
+            confirmBtn.textContent = 'Save';  // Change button text for input modal
+
+            // Create input field
+            const inputHTML = `
+                ${message}
+                <input type="text" class="modal-input" id="modalInput" placeholder="${placeholder}" />
+            `;
+            modalMessage.innerHTML = inputHTML;
+
+            modal.classList.add('show');
+
+            // Focus on input
+            setTimeout(() => {
+                const input = document.getElementById('modalInput');
+                if (input) input.focus();
+            }, 100);
+
+            // Set up confirm button
+            confirmBtn.onclick = () => {
+                console.log('[INPUT_MODAL] Confirm button clicked');
+                const input = document.getElementById('modalInput');
+                const value = input ? input.value : '';
+                console.log('[INPUT_MODAL] Captured value:', value);
+
+                // Call the callback BEFORE hiding modal to ensure value is passed correctly
+                if (onConfirm) {
+                    onConfirm(value);
+                }
+
+                // Then hide modal and reset
+                hideModal();
+            };
+
+            // Allow Enter key to confirm
+            setTimeout(() => {
+                const input = document.getElementById('modalInput');
+                if (input) {
+                    input.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter') {
+                            confirmBtn.click();
+                        }
+                    });
+                }
+            }, 100);
+        }
+
+        // Close modal on overlay click
+        document.addEventListener('DOMContentLoaded', () => {
+            const modal = document.getElementById('confirmModal');
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    hideModal();
+                }
+            });
+        });
+
+        const socket = io();
+        let totalRequests = 0;
+        let totalDuration = 0;
+        let totalSize = 0;
+        let dataLoaded = false;  // Track if we've loaded data on initial connection
+
+        // Update button states based on data availability
+        let isLoggingActive = false;
+
+        function updateButtonStates() {
+            const hasData = totalRequests > 0;
+            document.getElementById('btnStop').disabled = !isLoggingActive;
+            document.getElementById('btnSave').disabled = !hasData;
+            document.getElementById('btnExportNetwork').disabled = !hasData;
+            document.getElementById('btnExportVitals').disabled = !hasData;
+            document.getElementById('btnClear').disabled = !hasData;
+        }
+
+        // Check if a logging session is currently running
+        function checkLoggingStatus() {
+            console.log('[STATUS] Checking logging status');
+            fetch('/status')
+                .then(res => res.json())
+                .then(data => {
+                    console.log('[STATUS] Backend status:', data);
+                    if (data.is_running) {
+                        console.log('[STATUS] Session is running, enabling Stop button');
+                        isLoggingActive = true;
+                        document.getElementById('status').textContent = 'A logging session is active. Close the browser or click Stop to end it.';
+                    } else {
+                        console.log('[STATUS] No active session');
+                        isLoggingActive = false;
+                    }
+                    updateButtonStates();
+                })
+                .catch(err => console.error('[STATUS] Error checking status:', err));
+        }
+
+        // Load existing logs and vitals from server on page load
+        function loadExistingData() {
+            console.log('[LOAD] loadExistingData called, dataLoaded flag:', dataLoaded);
+
+            // Only load once when page first loads
+            if (dataLoaded) {
+                console.log('[LOAD] Data already loaded, skipping');
+                return;
+            }
+
+            console.log('[LOAD] Setting dataLoaded flag to true');
+            dataLoaded = true;
+
+            // Fetch network logs
+            console.log('[LOAD] Fetching logs from /logs endpoint');
+            fetch('/logs')
+                .then(res => res.json())
+                .then(data => {
+                    console.log('[LOAD] Received logs:', data);
+                    if (data.logs && data.logs.length > 0) {
+                        console.log('[LOAD] Reconstructing', data.logs.length, 'log entries');
+                        // Reconstruct log entries and stats
+                        data.logs.forEach(log => {
+                            // Add log entry to UI
+                            addLogEntry({
+                                duration: (log.duration * 1000).toFixed(2),
+                                size: log.size,
+                                url: log.url,
+                                status: log.status
+                            });
+
+                            // Update stats
+                            totalRequests++;
+                            totalDuration += log.duration * 1000;
+                            totalSize += log.size;
+                        });
+
+                        // Update display
+                        updateStatsDisplay();
+                        updateButtonStates();
+                        console.log('[LOAD] Logs loaded successfully, totalRequests:', totalRequests);
+                    } else {
+                        console.log('[LOAD] No logs to load');
+                    }
+                })
+                .catch(err => console.error('[LOAD] Error loading logs:', err));
+
+            // Fetch web vitals
+            console.log('[LOAD] Fetching vitals from /vitals endpoint');
+            fetch('/vitals')
+                .then(res => res.json())
+                .then(data => {
+                    console.log('[LOAD] Received vitals:', data);
+                    if (data.vitals && data.vitals.length > 0) {
+                        console.log('[LOAD] Loading', data.vitals.length, 'web vitals');
+                        // Get the latest value for each metric
+                        const latestMetrics = {};
+                        data.vitals.forEach(vital => {
+                            latestMetrics[vital.metric_name] = vital;
+                        });
+
+                        // Update UI with latest metrics
+                        Object.values(latestMetrics).forEach(metric => {
+                            updateWebVital(metric.metric_name, metric.value, metric.rating);
+                        });
+                        console.log('[LOAD] Web vitals loaded successfully');
+                    } else {
+                        console.log('[LOAD] No web vitals to load');
+                    }
+                })
+                .catch(err => console.error('[LOAD] Error loading web vitals:', err));
+        }
+
+        socket.on('connect', () => {
+            console.log('Connected to server');
+            // Load existing data when connecting
+            loadExistingData();
+            // Check if a logging session is already running
+            checkLoggingStatus();
+        });
+
+        socket.on('status', (data) => {
+            document.getElementById('status').textContent = data.message;
+
+            // Check if browser started successfully - enable stop button
+            if (data.message.includes('Browser opened') || data.message.includes('Starting')) {
+                isLoggingActive = true;
+                updateButtonStates();
+            }
+
+            // Only disable stop button when explicitly stopped via the Stop button
+            // Don't disable it when browser is just closed - user should still be able to stop the backend session
+            if (data.message.includes('Logging stopped')) {
+                isLoggingActive = false;
+                updateButtonStates();
+            }
+        });
+
+        socket.on('request', (data) => {
+            console.log('Request:', data);
+        });
+
+        socket.on('response', (data) => {
+            addLogEntry(data);
+            updateStats(parseFloat(data.duration), data.size);
+        });
+
+        socket.on('web_vital', (data) => {
+            updateWebVital(data.name, data.value, data.rating);
+        });
+
+        function updateWebVital(name, value, rating) {
+            const ratingColors = {
+                'good': '#4CAF50',
+                'needs-improvement': '#ff9800',
+                'poor': '#f44336'
+            };
+
+            if (name === 'LCP') {
+                document.getElementById('lcpValue').textContent = value.toFixed(2);
+                document.getElementById('lcpRating').textContent = rating.toUpperCase();
+                document.getElementById('lcpRating').style.color = ratingColors[rating] || '#999';
+            } else if (name === 'INP' || name === 'FID') {
+                document.getElementById('inpValue').textContent = value.toFixed(2);
+                document.getElementById('inpRating').textContent = rating.toUpperCase();
+                document.getElementById('inpRating').style.color = ratingColors[rating] || '#999';
+            } else if (name === 'CLS') {
+                document.getElementById('clsValue').textContent = value.toFixed(3);
+                document.getElementById('clsRating').textContent = rating.toUpperCase();
+                document.getElementById('clsRating').style.color = ratingColors[rating] || '#999';
+            }
+        }
+
+        function startLogging() {
+            document.getElementById('status').textContent = 'Starting browser...';
+
+            fetch('/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+            })
+            .then(res => {
+                if (!res.ok) {
+                    return res.json().then(err => { throw new Error(err.message || 'Failed to start'); });
+                }
+                return res.json();
+            })
+            .then(data => {
+                console.log('Started:', data);
+                isLoggingActive = true;
+                updateButtonStates();
+            })
+            .catch(err => {
+                document.getElementById('status').textContent = `Error: ${err.message}`;
+                isLoggingActive = false;
+                updateButtonStates();
+            });
+        }
+
+        function stopLogging() {
+            document.getElementById('status').textContent = 'Stopping logging...';
+
+            fetch('/stop', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            })
+            .then(res => res.json())
+            .then(data => {
+                console.log('Stopped:', data);
+                isLoggingActive = false;
+                updateButtonStates();
+                document.getElementById('status').textContent = `Logging stopped. ${data.total_requests} requests captured.`;
+                showNotification('Logging session stopped', 'success');
+            })
+            .catch(err => {
+                console.error('Error stopping:', err);
+                isLoggingActive = false;
+                updateButtonStates();
+                showNotification('Error stopping logging', 'error');
+            });
+        }
+
+        function saveCurrentLogs() {
+            if (totalRequests === 0) {
+                showNotification('No logs to save', 'warning');
+                return;
+            }
+
+            showInputModal(
+                'Save Current Session',
+                'Enter a name for this session (will be used as prefix for file names):',
+                '💾',
+                'Session name (optional)',
+                (sessionName) => {
+                    // Sanitize the session name (remove special characters, keep only alphanumeric, dash, underscore)
+                    const sanitizedName = sessionName ? sessionName.trim().replace(/[^a-zA-Z0-9_-]/g, '_') : '';
+
+                    // Export both network logs and web vitals with the custom prefix
+                    const networkUrl = sanitizedName ? `/export?prefix=${encodeURIComponent(sanitizedName)}` : '/export';
+                    const vitalsUrl = sanitizedName ? `/export-vitals?prefix=${encodeURIComponent(sanitizedName)}` : '/export-vitals';
+
+                    fetch(networkUrl, { method: 'GET' })
+                        .then(() => fetch(vitalsUrl, { method: 'GET' }))
+                        .then(() => {
+                            const fileName = sanitizedName ? `${sanitizedName}_NL_...` : 'NL_...';
+                            showNotification('Logs saved successfully! Check the Reports page.', 'success');
+                            document.getElementById('status').textContent = `Session saved as "${fileName}". ${totalRequests} requests logged.`;
+                        })
+                        .catch(err => {
+                            showNotification('Error saving logs', 'error');
+                        });
+                }
+            );
+        }
+
+        function exportLogs() {
+            if (totalRequests === 0) {
+                showNotification('No network logs to export', 'warning');
+                return;
+            }
+            window.location.href = '/export';
+        }
+
+        function exportVitals() {
+            if (totalRequests === 0) {
+                showNotification('No web vitals to export', 'warning');
+                return;
+            }
+            window.location.href = '/export-vitals';
+        }
+
+        function clearLogs() {
+            console.log('[CLEAR] Function called, totalRequests:', totalRequests);
+
+            if (totalRequests === 0) {
+                console.log('[CLEAR] No logs to clear, showing warning');
+                showNotification('No logs to clear', 'warning');
+                return;
+            }
+
+            console.log('[CLEAR] Showing confirmation modal');
+            showModal(
+                'Clear All Data',
+                'Are you sure you want to clear all logs and web vitals?<br><br>This action cannot be undone.',
+                '🗑️',
+                () => {
+                    console.log('[CLEAR] User confirmed, calling /clear endpoint');
+                    fetch('/clear', { method: 'POST' })
+                    .then(res => {
+                        console.log('[CLEAR] Response status:', res.status);
+                        return res.json();
+                    })
+                    .then(data => {
+                        console.log('[CLEAR] Response data:', data);
+                        console.log('[CLEAR] Clearing UI and resetting variables');
+
+                        document.getElementById('logsContainer').innerHTML = '<p style="text-align: center; color: #999;">No logs yet. Start logging to see network activity.</p>';
+                        totalRequests = 0;
+                        totalDuration = 0;
+                        totalSize = 0;
+                        updateStatsDisplay();
+                        updateButtonStates();  // Disable buttons after clearing
+
+                        // Reset web vitals
+                        document.getElementById('lcpValue').textContent = '-';
+                        document.getElementById('inpValue').textContent = '-';
+                        document.getElementById('clsValue').textContent = '-';
+                        document.getElementById('lcpRating').textContent = '';
+                        document.getElementById('lcpRating').style.color = '';
+                        document.getElementById('inpRating').textContent = '';
+                        document.getElementById('inpRating').style.color = '';
+                        document.getElementById('clsRating').textContent = '';
+                        document.getElementById('clsRating').style.color = '';
+
+                        document.getElementById('status').textContent = 'Logs and web vitals cleared';
+                        showNotification('All logs and web vitals have been cleared', 'success');
+
+                        console.log('[CLEAR] Clear operation completed successfully');
+                    })
+                    .catch(err => {
+                        console.error('[CLEAR] Error:', err);
+                        showNotification('Error clearing logs', 'error');
+                    });
+                }
+            );
+        }
+
+        function addLogEntry(data) {
+            const container = document.getElementById('logsContainer');
+
+            if (container.querySelector('p')) {
+                container.innerHTML = '';
+            }
+
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+
+            const statusClass = `status-${Math.floor(data.status / 100)}00`;
+
+            entry.innerHTML = `
+                <div class="log-url">${data.url}<span class="log-status ${statusClass}">${data.status}</span></div>
+                <div class="log-metrics">${data.duration} ms | ${formatBytes(data.size)}</div>
+            `;
+
+            container.insertBefore(entry, container.firstChild);
+        }
+
+        function updateStats(duration, size) {
+            totalRequests++;
+            totalDuration += duration;
+            totalSize += size;
+            updateStatsDisplay();
+            updateButtonStates();  // Enable buttons when data is available
+        }
+
+        function updateStatsDisplay() {
+            document.getElementById('totalRequests').textContent = totalRequests;
+            document.getElementById('avgDuration').textContent = totalRequests > 0 ? (totalDuration / totalRequests).toFixed(2) : '0.00';
+            document.getElementById('totalSize').textContent = (totalSize / 1024).toFixed(2);
+        }
+
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+        }
+    </script>
+</body>
+</html>

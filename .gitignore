@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual Environment
+maxEnv/
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Application specific
+reports/*.csv
+reports/network_logs/*.csv
+reports/web_vitals/*.csv
+logs/*.log
+
+# Keep directory structure but ignore contents
+!reports/.gitkeep
+!reports/network_logs/.gitkeep
+!reports/web_vitals/.gitkeep
+!logs/.gitkeep
+
+# Environment variables
+.env
+.env.local
+
+# Playwright browsers
+playwright-browsers/
