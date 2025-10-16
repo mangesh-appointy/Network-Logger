@@ -547,6 +547,10 @@
 
                     // Get columns in the specified order, only include columns that exist in data
                     const availableColumns = Object.keys(data[0]);
+
+                    // Check if this is a Web Vitals CSV (has 'rating' column)
+                    const isWebVitals = availableColumns.includes('rating');
+
                     const columns = columnOrder
                         .filter(col => availableColumns.includes(col))
                         .map((key, index) => ({
@@ -558,11 +562,38 @@
                     // Add any extra columns not in the predefined order (for Web Vitals CSVs)
                     availableColumns.forEach(key => {
                         if (!columnOrder.includes(key)) {
-                            columns.push({
+                            const columnDef = {
                                 title: key,
                                 data: key,
                                 visible: true
-                            });
+                            };
+
+                            // Apply custom rendering for Web Vitals 'rating' column
+                            if (isWebVitals && key === 'rating') {
+                                columnDef.render = function(data, type, row) {
+                                    if (type === 'display' && data) {
+                                        let bgColor = '#2a2a3e';  // default
+                                        let textColor = '#e0e0e0';
+
+                                        // Apply Google DevTools color scheme
+                                        if (data.includes('Good') || data.includes('✓')) {
+                                            bgColor = '#4CAF50';  // Green
+                                            textColor = '#ffffff';
+                                        } else if (data.includes('Needs Improvement') || data.includes('⚠')) {
+                                            bgColor = '#FF9800';  // Orange
+                                            textColor = '#ffffff';
+                                        } else if (data.includes('Poor') || data.includes('✗')) {
+                                            bgColor = '#F44336';  // Red
+                                            textColor = '#ffffff';
+                                        }
+
+                                        return `<span style="display: inline-block; padding: 6px 12px; background-color: ${bgColor}; color: ${textColor}; border-radius: 4px; font-weight: 600; font-size: 13px;">${data}</span>`;
+                                    }
+                                    return data;
+                                };
+                            }
+
+                            columns.push(columnDef);
                         }
                     });
 

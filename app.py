@@ -401,24 +401,40 @@ class NetworkLoggerWeb:
         # Save to reports/web_vitals directory
         filepath = os.path.join('reports', 'web_vitals', filename)
 
-        fieldnames = ['timestamp', 'url', 'metric_name', 'value_ms_or_score', 'rating', 'unit']
+        fieldnames = ['timestamp', 'url', 'metric_name', 'value_ms', 'score', 'rating']
 
-        # Add unit information to each row
+        # Process each vital into separate value_ms and score columns
         csv_data = []
         for vital in self.web_vitals:
-            row = vital.copy()
             metric_name = vital.get('metric_name', '')
+            value = vital.get('value', 0)
+            rating = vital.get('rating', 'unknown')
 
-            # Determine unit based on metric
-            if metric_name in ['LCP', 'INP', 'FID']:
-                row['unit'] = 'ms'
-            elif metric_name == 'CLS':
-                row['unit'] = 'score (unitless)'
+            # Format rating with symbols
+            if rating == 'good':
+                rating_text = '✓ Good'
+            elif rating == 'needs-improvement':
+                rating_text = '⚠ Needs Improvement'
+            elif rating == 'poor':
+                rating_text = '✗ Poor'
             else:
-                row['unit'] = ''
+                rating_text = rating
 
-            # Rename value key
-            row['value_ms_or_score'] = row.pop('value')
+            row = {
+                'timestamp': vital.get('timestamp', ''),
+                'url': vital.get('url', ''),
+                'metric_name': metric_name,
+                'value_ms': '',  # Default empty
+                'score': '',     # Default empty
+                'rating': rating_text
+            }
+
+            # Populate appropriate column based on metric type
+            if metric_name in ['LCP', 'INP', 'FID']:
+                row['value_ms'] = round(value, 2)
+            elif metric_name == 'CLS':
+                row['score'] = round(value, 4)  # CLS uses more decimal places
+
             csv_data.append(row)
 
         with open(filepath, 'w', newline='', encoding='utf-8') as csvfile:
